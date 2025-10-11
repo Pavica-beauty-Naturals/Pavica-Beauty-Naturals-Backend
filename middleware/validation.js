@@ -139,15 +139,32 @@ const productValidation = {
       .withMessage("Stock quantity must be a non-negative integer"),
   ],
   update: [
-    body("name").optional().trim().isLength({ min: 1 }),
+    body("name")
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage("Product name is required"),
     body("description").optional().trim(),
-    body("categoryId").optional().isUUID(),
-    body("price").optional().isFloat({ min: 0 }),
+    body("categoryId").isString().withMessage("Valid category ID is required"),
+    body("price")
+      .isFloat({ min: 0 })
+      .withMessage("Price must be a positive number"),
     body("sizeQuantity").optional().trim(),
-    body("qualities").optional().isArray(),
-    body("productFeatures").optional().isArray(),
-    body("howToUse").optional().isArray(),
-    body("stockQuantity").optional().isInt({ min: 0 }),
+    body("qualities")
+      .optional()
+      .isArray()
+      .withMessage("Qualities must be an array"),
+    body("productFeatures")
+      .optional()
+      .isArray()
+      .withMessage("Product features must be an array"),
+    body("howToUse")
+      .optional()
+      .isArray()
+      .withMessage("How to use must be an array"),
+    body("stockQuantity")
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage("Stock quantity must be a non-negative integer"),
     body("isActive").optional().isBoolean(),
   ],
 };

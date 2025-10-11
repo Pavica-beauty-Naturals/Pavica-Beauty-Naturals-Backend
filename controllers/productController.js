@@ -106,7 +106,6 @@ class ProductController {
           select: "userName rating title description createdAt",
           options: { sort: { createdAt: -1 } },
         });
-      
 
       if (!product) {
         return res.status(404).json({
@@ -271,6 +270,8 @@ class ProductController {
           }
         }
       });
+
+      console.log(updateData, req.body, "updateData");
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({

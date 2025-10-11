@@ -54,9 +54,12 @@ router.post(
 // @access  Private/Admin
 router.put(
   "/:id",
-  validate(productValidation.update),
   authenticateToken,
   requireAdmin,
+  uploadMultiple("images"),
+  handleUploadError,
+  parseMultipartJSONFields, // <-- NEW: parse JSON strings from form-data
+  validate(productValidation.update),
   ProductController.updateProduct
 );
 
