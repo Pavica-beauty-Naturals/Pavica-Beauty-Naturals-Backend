@@ -189,7 +189,7 @@ const reviewValidation = {
 // Cart validation rules
 const cartValidation = {
   add: [
-    body("productId").isUUID().withMessage("Valid product ID is required"),
+    body("productId").isString().withMessage("Valid product ID is required"),
     body("quantity")
       .isInt({ min: 1 })
       .withMessage("Quantity must be at least 1"),
