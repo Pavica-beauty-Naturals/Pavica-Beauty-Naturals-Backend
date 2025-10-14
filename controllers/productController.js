@@ -135,7 +135,7 @@ class ProductController {
         description,
         categoryId,
         price,
-        sizeQuantity,
+        sizeQuantity = [],
         qualities = [],
         productFeatures = [],
         howToUse = [],

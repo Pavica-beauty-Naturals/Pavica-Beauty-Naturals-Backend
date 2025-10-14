@@ -21,10 +21,12 @@ const productSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    sizeQuantity: {
-      type: String,
-      trim: true,
-    },
+    sizeQuantity: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
     // Cloudinary image URLs array
     images: [
       {
@@ -111,7 +113,6 @@ productSchema.index({ price: 1 });
 productSchema.index({ isActive: 1 });
 productSchema.index({ averageRating: -1 });
 productSchema.index({ createdAt: -1 });
-
 
 productSchema.virtual("reviews", {
   ref: "Review", // The model to use

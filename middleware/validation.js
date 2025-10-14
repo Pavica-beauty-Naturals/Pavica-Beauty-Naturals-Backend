@@ -92,7 +92,12 @@ const userValidation = {
 
 // Parse JSON fields in multipart/form-data before validation
 const parseMultipartJSONFields = (req, res, next) => {
-  const jsonFields = ["qualities", "productFeatures", "howToUse"];
+  const jsonFields = [
+    "qualities",
+    "productFeatures",
+    "howToUse",
+    "sizeQuantity",
+  ];
 
   jsonFields.forEach((field) => {
     if (req.body[field]) {
@@ -120,7 +125,10 @@ const productValidation = {
     body("price")
       .isFloat({ min: 0 })
       .withMessage("Price must be a positive number"),
-    body("sizeQuantity").optional().trim(),
+    body("sizeQuantity")
+      .optional()
+      .isArray()
+      .withMessage("sizeQuantity must be an array"),
     body("qualities")
       .optional()
       .isArray()
