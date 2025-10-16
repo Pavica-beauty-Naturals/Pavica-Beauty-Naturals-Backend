@@ -71,6 +71,13 @@ cartSchema.methods.addItem = async function (
   );
 
   if (existingItem) {
+    // ✅ Check if total desired quantity exceeds available stock
+    const totalRequested = existingItem.quantity + quantity;
+    if (totalRequested > product.stockQuantity) {
+      throw new Error(
+        `Only ${product.stockQuantity} items available in stock. You already have ${existingItem.quantity} in your cart.`
+      );
+    }
     existingItem.quantity += quantity;
   } else {
     this.items.push({ product: productId, quantity, sizeQuantity });

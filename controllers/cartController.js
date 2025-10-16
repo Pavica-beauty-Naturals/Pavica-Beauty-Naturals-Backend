@@ -36,6 +36,7 @@ class CartController {
         return {
           _id: item._id,
           quantity: item.quantity,
+          sizeQuantity: item.sizeQuantity,
           product: {
             _id: product._id,
             name: product.name,
@@ -188,10 +189,26 @@ class CartController {
         );
         const updatedItem = cart.items.id(cartItemId);
 
+        // ✅ Calculate summary
+        const activeItems = cart.items.filter(
+          (i) => i.product && i.product.isActive
+        );
+        const totalItems = activeItems.reduce((sum, i) => sum + i.quantity, 0);
+        const totalAmount = activeItems.reduce(
+          (sum, i) => sum + i.product.price * i.quantity,
+          0
+        );
+
         res.json({
           status: "success",
           message: "Cart item updated successfully",
-          data: { cartItem: updatedItem },
+          data: {
+            cartItem: updatedItem,
+            summary: {
+              totalItems,
+              totalAmount: Math.round(totalAmount * 100) / 100,
+            },
+          },
         });
       } catch (cartError) {
         return res.status(400).json({
@@ -231,9 +248,32 @@ class CartController {
 
       await cart.removeItem(item.product);
 
+      // Repopulate after removal
+      await cart.populate(
+        "items.product",
+        "name price sizeQuantity productImageUrl stockQuantity isActive"
+      );
+
+      // ✅ Calculate summary after removal
+      const activeItems = cart.items.filter(
+        (i) => i.product && i.product.isActive
+      );
+      const totalItems = activeItems.reduce((sum, i) => sum + i.quantity, 0);
+      const totalAmount = activeItems.reduce(
+        (sum, i) => sum + i.product.price * i.quantity,
+        0
+      );
+
       res.json({
         status: "success",
         message: "Item removed from cart successfully",
+        data: {
+          deletedCartItemId: cartItemId,
+          summary: {
+            totalItems,
+            totalAmount: Math.round(totalAmount * 100) / 100,
+          },
+        },
       });
     } catch (error) {
       console.error("Remove from cart error:", error);
