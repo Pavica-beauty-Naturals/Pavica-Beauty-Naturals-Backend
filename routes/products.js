@@ -30,6 +30,11 @@ router.get(
   ProductController.getAllProducts
 );
 
+// @route   GET /api/products/search
+// @desc    similar products or search products by name and category
+// @access  Public
+router.get("/search", ProductController.searchProducts);
+
 // @route   GET /api/products/:id
 // @desc    Get single product by ID
 // @access  Public

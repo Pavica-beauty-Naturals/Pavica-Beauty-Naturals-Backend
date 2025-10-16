@@ -201,6 +201,9 @@ const cartValidation = {
     body("quantity")
       .isInt({ min: 1 })
       .withMessage("Quantity must be at least 1"),
+    body("sizeQuantity")
+      .isString()
+      .withMessage("Size Quantity must be selected"),
   ],
   update: [
     body("quantity")

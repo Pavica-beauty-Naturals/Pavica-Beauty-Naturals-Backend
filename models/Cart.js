@@ -19,6 +19,10 @@ const cartSchema = new mongoose.Schema(
           required: true,
           min: 1,
         },
+        sizeQuantity: {
+          type: String,
+          required: true,
+        },
       },
     ],
   },
@@ -46,7 +50,11 @@ cartSchema.virtual("totalAmount").get(function () {
 });
 
 // Method to add item to cart
-cartSchema.methods.addItem = async function (productId, quantity) {
+cartSchema.methods.addItem = async function (
+  productId,
+  quantity,
+  sizeQuantity
+) {
   const Product = mongoose.model("Product");
   const product = await Product.findById(productId);
 
@@ -65,7 +73,7 @@ cartSchema.methods.addItem = async function (productId, quantity) {
   if (existingItem) {
     existingItem.quantity += quantity;
   } else {
-    this.items.push({ product: productId, quantity });
+    this.items.push({ product: productId, quantity, sizeQuantity });
   }
 
   return this.save();
@@ -85,7 +93,7 @@ cartSchema.methods.updateItemQuantity = async function (productId, quantity) {
   }
 
   const item = this.items.find(
-    (item) => item.product.toString() === productId.toString()
+    (item) => item.product._id.toString() === productId.toString()
   );
 
   if (item) {

@@ -7,7 +7,7 @@ class CartController {
     try {
       let cart = await Cart.findOne({ user: req.user.id }).populate(
         "items.product",
-        "name price sizeQuantity productImageUrl stockQuantity isActive"
+        "name price sizeQuantity images stockQuantity isActive averageRating ratings"
       );
 
       if (!cart) {
@@ -15,16 +15,47 @@ class CartController {
         await cart.save();
       }
 
-      // Filter out items for inactive products
+      // Filter out inactive products
       const activeItems = cart.items.filter(
         (item) => item.product && item.product.isActive
       );
 
-      const totalItems = activeItems.reduce(
+      // Prepare response items
+      const cartItems = activeItems.map((item) => {
+        const product = item.product;
+
+        // If ratings array exists, calculate average
+        const avgRating =
+          product.ratings && product.ratings.length > 0
+            ? product.ratings.reduce((a, b) => a + b, 0) /
+              product.ratings.length
+            : product.averageRating || 0;
+
+        console.log(product);
+
+        return {
+          _id: item._id,
+          quantity: item.quantity,
+          product: {
+            _id: product._id,
+            name: product.name,
+            price: product.price,
+            sizeQuantity: product.sizeQuantity,
+            stockQuantity: product.stockQuantity,
+            averageRating: Math.round(avgRating * 10) / 10,
+            image: Array.isArray(product.images)
+              ? product.images[0]
+              : product.images, // if it's a string instead of array
+          },
+        };
+      });
+
+      // Summary
+      const totalItems = cartItems.reduce(
         (sum, item) => sum + item.quantity,
         0
       );
-      const totalAmount = activeItems.reduce(
+      const totalAmount = cartItems.reduce(
         (sum, item) => sum + item.product.price * item.quantity,
         0
       );
@@ -32,7 +63,7 @@ class CartController {
       res.json({
         status: "success",
         data: {
-          cartItems: activeItems,
+          cartItems,
           summary: {
             totalItems,
             totalAmount: Math.round(totalAmount * 100) / 100,
@@ -51,15 +82,36 @@ class CartController {
   // Add item to cart
   static async addToCart(req, res) {
     try {
-      const { productId, quantity } = req.body;
+      const { productId, quantity, sizeQuantity } = req.body;
 
       let cart = await Cart.findOne({ user: req.user.id });
       if (!cart) {
         cart = new Cart({ user: req.user.id, items: [] });
       }
 
+      // Fetch product to validate sizeQuantity
+      const product = await Product.findById(productId);
+      if (!product || !product.isActive) {
+        return res.status(404).json({
+          status: "error",
+          message: "Product not found or inactive",
+        });
+      }
+
+      // Check if requested size exists in product
+      const validSize = product.sizeQuantity.find(
+        (eachQuantity) => eachQuantity === sizeQuantity
+      );
+
+      if (!validSize) {
+        return res.status(400).json({
+          status: "error",
+          message: "Selected size not available for this product",
+        });
+      }
+
       try {
-        await cart.addItem(productId, quantity);
+        await cart.addItem(productId, quantity, sizeQuantity);
 
         // Populate the product data for response
         await cart.populate(
@@ -68,7 +120,9 @@ class CartController {
         );
 
         const addedItem = cart.items.find(
-          (item) => item.product._id.toString() === productId
+          (item) =>
+            item.product._id.toString() === productId &&
+            item.sizeQuantity === sizeQuantity
         );
 
         res.status(201).json({
@@ -118,6 +172,13 @@ class CartController {
       }
 
       try {
+        if (quantity > item.product.stockQuantity) {
+          return res.status(400).json({
+            status: "error",
+            message: `Only ${item.product.stockQuantity} items available in stock`,
+          });
+        }
+
         await cart.updateItemQuantity(item.product._id, quantity);
 
         // Get updated item

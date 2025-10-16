@@ -2,6 +2,7 @@ import Product from "../models/Product.js";
 import Category from "../models/Category.js";
 import { uploadMultipleImages } from "../config/cloudinary.js";
 import fs from "fs";
+import mongoose from "mongoose";
 
 class ProductController {
   // Get all products with filtering and pagination
@@ -81,6 +82,64 @@ class ProductController {
       res.status(500).json({
         status: "error",
         message: "Failed to get products",
+      });
+    }
+  }
+
+  // Search products by name and/or category (by name or ID)
+  static async searchProducts(req, res) {
+    try {
+      const { name, category, limit = 10, excludeId } = req.query;
+
+      // Build base query
+      const query = { isActive: true };
+
+      // Match by product name (case-insensitive partial match)
+      if (name) {
+        query.name = { $regex: name, $options: "i" };
+      }
+
+      // Handle category search by name or ID
+      if (category) {
+        const categoryDoc = await Category.findOne({
+          $or: [
+            {
+              _id: mongoose.Types.ObjectId.isValid(category) ? category : null,
+            },
+            { name: { $regex: category, $options: "i" } },
+          ],
+        });
+
+        if (categoryDoc) {
+          query.category = categoryDoc._id;
+        } else {
+          return res.status(404).json({
+            status: "error",
+            message: "Category not found",
+          });
+        }
+      }
+
+      // Exclude a specific product (useful for similar products)
+      if (excludeId) {
+        query._id = { $ne: excludeId };
+      }
+
+      // Fetch products
+      const products = await Product.find(query)
+        .populate("category", "name")
+        .limit(parseInt(limit))
+        .sort({ createdAt: -1 });
+
+      res.json({
+        status: "success",
+        data: { products },
+      });
+    } catch (error) {
+      console.error("Search products error:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to search products",
       });
     }
   }
