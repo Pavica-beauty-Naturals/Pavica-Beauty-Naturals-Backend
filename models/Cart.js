@@ -23,6 +23,12 @@ const cartSchema = new mongoose.Schema(
           type: String,
           required: true,
         },
+        // Store the price at the time of adding to cart
+        priceAtTime: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
       },
     ],
   },
@@ -45,7 +51,7 @@ cartSchema.virtual("totalItems").get(function () {
 // Virtual for total amount
 cartSchema.virtual("totalAmount").get(function () {
   return this.items.reduce((total, item) => {
-    return total + (item.product?.price || 0) * item.quantity;
+    return total + (item.priceAtTime || 0) * item.quantity;
   }, 0);
 });
 
@@ -62,32 +68,52 @@ cartSchema.methods.addItem = async function (
     throw new Error("Product not available");
   }
 
-  if (product.stockQuantity < quantity) {
-    throw new Error(`Only ${product.stockQuantity} items available in stock`);
+  // Get price and stock for the specific size
+  const price = product.getPriceForSize(sizeQuantity);
+  const stock = product.getStockForSize(sizeQuantity);
+
+  if (stock < quantity) {
+    throw new Error(
+      `Only ${stock} items available in stock for size ${sizeQuantity}`
+    );
   }
 
+  // Find existing item with same product and size
   const existingItem = this.items.find(
-    (item) => item.product.toString() === productId.toString()
+    (item) =>
+      item.product.toString() === productId.toString() &&
+      item.sizeQuantity === sizeQuantity
   );
 
   if (existingItem) {
     // ✅ Check if total desired quantity exceeds available stock
     const totalRequested = existingItem.quantity + quantity;
-    if (totalRequested > product.stockQuantity) {
+    if (totalRequested > stock) {
       throw new Error(
-        `Only ${product.stockQuantity} items available in stock. You already have ${existingItem.quantity} in your cart.`
+        `Only ${stock} items available in stock for size ${sizeQuantity}. You already have ${existingItem.quantity} in your cart.`
       );
     }
     existingItem.quantity += quantity;
+    // Update price in case it changed
+    existingItem.priceAtTime = price;
   } else {
-    this.items.push({ product: productId, quantity, sizeQuantity });
+    this.items.push({
+      product: productId,
+      quantity,
+      sizeQuantity,
+      priceAtTime: price,
+    });
   }
 
   return this.save();
 };
 
 // Method to update item quantity
-cartSchema.methods.updateItemQuantity = async function (productId, quantity) {
+cartSchema.methods.updateItemQuantity = async function (
+  productId,
+  quantity,
+  sizeQuantity
+) {
   const Product = mongoose.model("Product");
   const product = await Product.findById(productId);
 
@@ -95,25 +121,38 @@ cartSchema.methods.updateItemQuantity = async function (productId, quantity) {
     throw new Error("Product not available");
   }
 
-  if (product.stockQuantity < quantity) {
-    throw new Error(`Only ${product.stockQuantity} items available in stock`);
+  // Get stock for the specific size
+  const stock = product.getStockForSize(sizeQuantity);
+
+  if (stock < quantity) {
+    throw new Error(
+      `Only ${stock} items available in stock for size ${sizeQuantity}`
+    );
   }
 
   const item = this.items.find(
-    (item) => item.product._id.toString() === productId.toString()
+    (item) =>
+      item.product._id.toString() === productId.toString() &&
+      item.sizeQuantity === sizeQuantity
   );
 
   if (item) {
     item.quantity = quantity;
+    // Update price in case it changed
+    item.priceAtTime = product.getPriceForSize(sizeQuantity);
   }
 
   return this.save();
 };
 
 // Method to remove item from cart
-cartSchema.methods.removeItem = function (productId) {
+cartSchema.methods.removeItem = function (productId, sizeQuantity) {
   this.items = this.items.filter(
-    (item) => item.product.toString() !== productId.toString()
+    (item) =>
+      !(
+        item.product.toString() === productId.toString() &&
+        item.sizeQuantity === sizeQuantity
+      )
   );
   return this.save();
 };
@@ -163,7 +202,7 @@ cartSchema.methods.validateItems = async function () {
     }
 
     validationResults.summary.totalItems += item.quantity;
-    validationResults.summary.totalAmount += product.price * item.quantity;
+    validationResults.summary.totalAmount += item.priceAtTime * item.quantity;
   }
 
   validationResults.summary.totalAmount =

@@ -29,6 +29,10 @@ const orderSchema = new mongoose.Schema(
           required: true,
           min: 0,
         },
+        sizeQuantity: {
+          type: String,
+          required: true,
+        },
       },
     ],
     totalAmount: {
@@ -193,13 +197,14 @@ orderSchema.statics.createFromCart = async function (
       );
     }
 
-    const itemTotal = product.price * cartItem.quantity;
+    const itemTotal = cartItem.priceAtTime * cartItem.quantity;
     totalAmount += itemTotal;
 
     orderItems.push({
       product: product._id,
       quantity: cartItem.quantity,
-      price: product.price,
+      price: cartItem.priceAtTime,
+      sizeQuantity: cartItem.sizeQuantity,
     });
   }
 
@@ -227,11 +232,26 @@ orderSchema.statics.createFromCart = async function (
   // Clear cart after successful order creation
   await cart.clear();
 
-  // Update product stock
+  // Update product stock (handle both size-based and general stock)
   for (const item of orderItems) {
-    await Product.findByIdAndUpdate(item.product, {
-      $inc: { stockQuantity: -item.quantity },
-    });
+    const product = await Product.findById(item.product);
+    if (product) {
+      // If product has size-based pricing, update specific size stock
+      if (product.sizePricing && product.sizePricing.length > 0) {
+        const sizeIndex = product.sizePricing.findIndex(
+          (sp) => sp.size === item.sizeQuantity
+        );
+        if (sizeIndex !== -1) {
+          product.sizePricing[sizeIndex].stockQuantity -= item.quantity;
+          await product.save();
+        }
+      } else {
+        // Fallback to general stock reduction
+        await Product.findByIdAndUpdate(item.product, {
+          $inc: { stockQuantity: -item.quantity },
+        });
+      }
+    }
   }
 
   return order;

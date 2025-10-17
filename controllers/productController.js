@@ -193,7 +193,9 @@ class ProductController {
         name,
         description,
         categoryId,
-        price,
+        basePrice,
+        price, // For backward compatibility
+        sizePricing = [],
         sizeQuantity = [],
         qualities = [],
         productFeatures = [],
@@ -259,13 +261,26 @@ class ProductController {
         });
       }
 
+      // Determine the price to use (basePrice takes precedence, fallback to price for backward compatibility)
+      const finalBasePrice =
+        basePrice !== undefined
+          ? parseFloat(basePrice)
+          : price
+          ? parseFloat(price)
+          : 0;
+
       // Create product document
       const product = new Product({
         name,
         description,
         category: categoryId,
-        price: parseFloat(price),
-        sizeQuantity,
+        basePrice: finalBasePrice,
+        sizePricing: sizePricing.map((item) => ({
+          size: item.size,
+          price: parseFloat(item.price),
+          stockQuantity: parseInt(item.stockQuantity || stockQuantity || 0),
+        })),
+        sizeQuantity, // Keep for backward compatibility
         qualities,
         productFeatures,
         howToUse,
@@ -311,7 +326,9 @@ class ProductController {
         "name",
         "description",
         "categoryId",
-        "price",
+        "basePrice",
+        "price", // For backward compatibility
+        "sizePricing",
         "sizeQuantity",
         "qualities",
         "productFeatures",
@@ -324,6 +341,16 @@ class ProductController {
         if (req.body[field] !== undefined) {
           if (field === "categoryId") {
             updateData.category = req.body[field];
+          } else if (field === "sizePricing") {
+            // Process sizePricing array
+            updateData.sizePricing = req.body[field].map((item) => ({
+              size: item.size,
+              price: parseFloat(item.price),
+              stockQuantity: parseInt(item.stockQuantity || 0),
+            }));
+          } else if (field === "basePrice" || field === "price") {
+            // Handle price fields
+            updateData.basePrice = parseFloat(req.body[field]);
           } else {
             updateData[field] = req.body[field];
           }
@@ -480,6 +507,56 @@ class ProductController {
       res.status(500).json({
         status: "error",
         message: "Failed to delete product",
+      });
+    }
+  }
+
+  // Get product pricing for specific size
+  static async getProductPricing(req, res) {
+    try {
+      const productId = req.params.id;
+      const { size } = req.query;
+
+      const product = await Product.findById(productId);
+      if (
+        !product ||
+        ((!req.user || req.user.role !== "admin") && !product.isActive)
+      ) {
+        return res.status(404).json({
+          status: "error",
+          message: "Product not found",
+        });
+      }
+
+      let response = {
+        productId: product._id,
+        name: product.name,
+        basePrice: product.basePrice,
+        sizePricing: product.sizePricing || [],
+      };
+
+      if (size) {
+        const price = product.getPriceForSize(size);
+        const stock = product.getStockForSize(size);
+        const isAvailable = product.isSizeAvailable(size);
+
+        response.selectedSize = {
+          size,
+          price,
+          stock,
+          isAvailable,
+        };
+      }
+
+      res.json({
+        status: "success",
+        data: response,
+      });
+    } catch (error) {
+      console.error("Get product pricing error:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to get product pricing",
       });
     }
   }

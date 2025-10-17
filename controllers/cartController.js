@@ -37,12 +37,16 @@ class CartController {
           _id: item._id,
           quantity: item.quantity,
           sizeQuantity: item.sizeQuantity,
+          priceAtTime: item.priceAtTime,
           product: {
             _id: product._id,
             name: product.name,
-            price: product.price,
-            sizeQuantity: product.sizeQuantity,
-            stockQuantity: product.stockQuantity,
+            price: item.priceAtTime, // Use the price at time of adding to cart
+            basePrice: product.basePrice,
+            sizePricing: product.sizePricing,
+            stockQuantity: product.getStockForSize
+              ? product.getStockForSize(item.sizeQuantity)
+              : product.stockQuantity,
             averageRating: Math.round(avgRating * 10) / 10,
             image: Array.isArray(product.images)
               ? product.images[0]
@@ -57,7 +61,7 @@ class CartController {
         0
       );
       const totalAmount = cartItems.reduce(
-        (sum, item) => sum + item.product.price * item.quantity,
+        (sum, item) => sum + item.priceAtTime * item.quantity,
         0
       );
 
@@ -100,9 +104,19 @@ class CartController {
       }
 
       // Check if requested size exists in product
-      const validSize = product.sizeQuantity.find(
-        (eachQuantity) => eachQuantity === sizeQuantity
-      );
+      let validSize = false;
+
+      // Check in new sizePricing structure
+      if (product.sizePricing && product.sizePricing.length > 0) {
+        validSize = product.sizePricing.some(
+          (item) => item.size === sizeQuantity
+        );
+      } else {
+        // Fallback to old sizeQuantity structure
+        validSize = product.sizeQuantity.find(
+          (eachQuantity) => eachQuantity === sizeQuantity
+        );
+      }
 
       if (!validSize) {
         return res.status(400).json({
@@ -180,7 +194,11 @@ class CartController {
           });
         }
 
-        await cart.updateItemQuantity(item.product._id, quantity);
+        await cart.updateItemQuantity(
+          item.product._id,
+          quantity,
+          item.sizeQuantity
+        );
 
         // Get updated item
         await cart.populate(
@@ -195,7 +213,7 @@ class CartController {
         );
         const totalItems = activeItems.reduce((sum, i) => sum + i.quantity, 0);
         const totalAmount = activeItems.reduce(
-          (sum, i) => sum + i.product.price * i.quantity,
+          (sum, i) => sum + i.priceAtTime * i.quantity,
           0
         );
 
@@ -246,7 +264,7 @@ class CartController {
         });
       }
 
-      await cart.removeItem(item.product);
+      await cart.removeItem(item.product._id, item.sizeQuantity);
 
       // Repopulate after removal
       await cart.populate(
@@ -260,7 +278,7 @@ class CartController {
       );
       const totalItems = activeItems.reduce((sum, i) => sum + i.quantity, 0);
       const totalAmount = activeItems.reduce(
-        (sum, i) => sum + i.product.price * i.quantity,
+        (sum, i) => sum + i.priceAtTime * i.quantity,
         0
       );
 

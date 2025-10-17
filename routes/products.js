@@ -35,6 +35,16 @@ router.get(
 // @access  Public
 router.get("/search", ProductController.searchProducts);
 
+// @route   GET /api/products/:id/pricing
+// @desc    Get product pricing for specific size
+// @access  Public
+router.get(
+  "/:id/pricing",
+  validate(productValidation.getPricing),
+  optionalAuth,
+  ProductController.getProductPricing
+);
+
 // @route   GET /api/products/:id
 // @desc    Get single product by ID
 // @access  Public

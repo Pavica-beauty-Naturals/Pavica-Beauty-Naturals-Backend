@@ -108,6 +108,7 @@ const parseMultipartJSONFields = (req, res, next) => {
     "productFeatures",
     "howToUse",
     "sizeQuantity",
+    "sizePricing",
   ];
 
   jsonFields.forEach((field) => {
@@ -134,8 +135,32 @@ const productValidation = {
     body("description").optional().trim(),
     body("categoryId").isString().withMessage("Valid category ID is required"),
     body("price")
+      .optional()
       .isFloat({ min: 0 })
       .withMessage("Price must be a positive number"),
+    body("basePrice")
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage("Base price must be a positive number"),
+    body("sizePricing")
+      .optional()
+      .isArray()
+      .withMessage("sizePricing must be an array"),
+    body("sizePricing.*.size")
+      .optional()
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage("Size is required for each pricing option"),
+    body("sizePricing.*.price")
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage("Price must be a positive number for each pricing option"),
+    body("sizePricing.*.stockQuantity")
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage(
+        "Stock quantity must be a non-negative integer for each pricing option"
+      ),
     body("sizeQuantity")
       .optional()
       .isArray()
@@ -156,18 +181,63 @@ const productValidation = {
       .optional()
       .isInt({ min: 0 })
       .withMessage("Stock quantity must be a non-negative integer"),
+    // Custom validation to ensure either price/basePrice or sizePricing is provided
+    body().custom((value, { req }) => {
+      const hasPrice = req.body.price || req.body.basePrice;
+      const hasSizePricing =
+        req.body.sizePricing && req.body.sizePricing.length > 0;
+
+      if (!hasPrice && !hasSizePricing) {
+        throw new Error(
+          "Either price/basePrice or sizePricing must be provided"
+        );
+      }
+
+      return true;
+    }),
   ],
   update: [
     body("name")
+      .optional()
       .trim()
       .isLength({ min: 1 })
       .withMessage("Product name is required"),
     body("description").optional().trim(),
-    body("categoryId").isString().withMessage("Valid category ID is required"),
+    body("categoryId")
+      .optional()
+      .isString()
+      .withMessage("Valid category ID is required"),
     body("price")
+      .optional()
       .isFloat({ min: 0 })
       .withMessage("Price must be a positive number"),
-    body("sizeQuantity").optional().trim(),
+    body("basePrice")
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage("Base price must be a positive number"),
+    body("sizePricing")
+      .optional()
+      .isArray()
+      .withMessage("sizePricing must be an array"),
+    body("sizePricing.*.size")
+      .optional()
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage("Size is required for each pricing option"),
+    body("sizePricing.*.price")
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage("Price must be a positive number for each pricing option"),
+    body("sizePricing.*.stockQuantity")
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage(
+        "Stock quantity must be a non-negative integer for each pricing option"
+      ),
+    body("sizeQuantity")
+      .optional()
+      .isArray()
+      .withMessage("sizeQuantity must be an array"),
     body("qualities")
       .optional()
       .isArray()
@@ -185,6 +255,13 @@ const productValidation = {
       .isInt({ min: 0 })
       .withMessage("Stock quantity must be a non-negative integer"),
     body("isActive").optional().isBoolean(),
+  ],
+  getPricing: [
+    query("size")
+      .optional()
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage("Size must be a non-empty string"),
   ],
 };
 
@@ -213,13 +290,19 @@ const cartValidation = {
       .isInt({ min: 1 })
       .withMessage("Quantity must be at least 1"),
     body("sizeQuantity")
-      .isString()
+      .trim()
+      .isLength({ min: 1 })
       .withMessage("Size Quantity must be selected"),
   ],
   update: [
     body("quantity")
       .isInt({ min: 1 })
       .withMessage("Quantity must be at least 1"),
+    body("sizeQuantity")
+      .optional()
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage("Size Quantity must be a non-empty string"),
   ],
 };
 

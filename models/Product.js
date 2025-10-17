@@ -16,11 +16,32 @@ const productSchema = new mongoose.Schema(
       ref: "Category",
       required: true,
     },
-    price: {
+    // Base price for the product (can be used as default or for products without size variants)
+    basePrice: {
       type: Number,
-      required: true,
       min: 0,
     },
+    // Size-based pricing configuration
+    sizePricing: [
+      {
+        size: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        price: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+        stockQuantity: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+      },
+    ],
+    // Legacy field for backward compatibility
     sizeQuantity: [
       {
         type: String,
@@ -114,12 +135,54 @@ productSchema.index({ isActive: 1 });
 productSchema.index({ averageRating: -1 });
 productSchema.index({ createdAt: -1 });
 
+// Virtual for current price (for backward compatibility)
+productSchema.virtual("price").get(function () {
+  // If sizePricing exists and has items, return the lowest price
+  if (this.sizePricing && this.sizePricing.length > 0) {
+    return Math.min(...this.sizePricing.map((item) => item.price));
+  }
+  // Otherwise return basePrice
+  return this.basePrice || 0;
+});
+
 productSchema.virtual("reviews", {
   ref: "Review", // The model to use
   localField: "_id", // Field on Product
   foreignField: "product", // Field on Review referencing Product
   justOne: false, // If false, will populate as array
 });
+
+// Instance method to get price for specific size
+productSchema.methods.getPriceForSize = function (size) {
+  if (this.sizePricing && this.sizePricing.length > 0) {
+    const sizeOption = this.sizePricing.find((item) => item.size === size);
+    return sizeOption ? sizeOption.price : this.basePrice || 0;
+  }
+  return this.basePrice || 0;
+};
+
+// Instance method to get stock for specific size
+productSchema.methods.getStockForSize = function (size) {
+  if (this.sizePricing && this.sizePricing.length > 0) {
+    const sizeOption = this.sizePricing.find((item) => item.size === size);
+    return sizeOption ? sizeOption.stockQuantity : this.stockQuantity || 0;
+  }
+  return this.stockQuantity || 0;
+};
+
+// Instance method to check if size is available
+productSchema.methods.isSizeAvailable = function (size) {
+  const stock = this.getStockForSize(size);
+  return stock > 0;
+};
+
+// Instance method to get available sizes
+productSchema.methods.getAvailableSizes = function () {
+  if (this.sizePricing && this.sizePricing.length > 0) {
+    return this.sizePricing.filter((item) => item.stockQuantity > 0);
+  }
+  return [];
+};
 
 // Static method to update product ratings
 productSchema.statics.updateRating = async function (productId) {
