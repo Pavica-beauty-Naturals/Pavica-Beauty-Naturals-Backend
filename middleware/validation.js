@@ -58,6 +58,17 @@ const userValidation = {
     body("firstName").optional().trim().isLength({ min: 1 }),
     body("lastName").optional().trim().isLength({ min: 1 }),
     body("phone").optional().isMobilePhone(),
+    // Optional address payload
+    body("address").optional().isObject(),
+    body("address.type").optional().isIn(["shipping", "billing"]),
+    body("address.phone").optional().isMobilePhone(),
+    body("address.addressLine1").optional().trim().isLength({ min: 1 }),
+    body("address.addressLine2").optional().trim(),
+    body("address.city").optional().trim().isLength({ min: 1 }),
+    body("address.state").optional().trim().isLength({ min: 1 }),
+    body("address.postalCode").optional().trim().isLength({ min: 1 }),
+    body("address.country").optional().trim().isLength({ min: 1 }),
+    body("address.isDefault").optional().isBoolean(),
   ],
   addAddress: [
     body("type")

@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import Address from "../models/Address.js";
 
 class UserController {
   // Get user profile with addresses
@@ -12,11 +13,16 @@ class UserController {
         });
       }
 
+      // Fetch addresses from Address collection
+      const addresses = await Address.find({ user: req.user.id }).sort({
+        createdAt: -1,
+      });
+
       res.json({
         status: "success",
         data: {
           user,
-          addresses: user.addresses || [],
+          addresses,
         },
       });
     } catch (error) {
@@ -31,7 +37,7 @@ class UserController {
   // Update user profile
   static async updateProfile(req, res) {
     try {
-      const { firstName, lastName, phone } = req.body;
+      const { firstName, lastName, phone, address } = req.body;
       const updateData = {};
 
       if (firstName) updateData.firstName = firstName;
@@ -56,11 +62,63 @@ class UserController {
           message: "User not found",
         });
       }
+      let createdAddress = null;
+
+      // If address payload provided, create/update address based on type
+      if (address && typeof address === "object") {
+        const {
+          type = "shipping", // Default to shipping if no type specified
+          phone: addressPhone,
+          addressLine1,
+          addressLine2,
+          city,
+          state,
+          postalCode,
+          country,
+          isDefault = false,
+        } = address;
+
+        // Check if address of this type already exists
+        const existingAddress = await Address.findOne({
+          user: req.user.id,
+          type,
+        });
+
+        if (existingAddress) {
+          // Update existing address
+          existingAddress.phone = addressPhone;
+          existingAddress.addressLine1 = addressLine1;
+          existingAddress.addressLine2 = addressLine2;
+          existingAddress.city = city;
+          existingAddress.state = state;
+          existingAddress.postalCode = postalCode;
+          existingAddress.country = country;
+          existingAddress.isDefault = isDefault;
+
+          createdAddress = await existingAddress.save();
+        } else {
+          // Create new address
+          const addressPayload = {
+            user: req.user.id,
+            type,
+            phone: addressPhone,
+            addressLine1,
+            addressLine2,
+            city,
+            state,
+            postalCode,
+            country,
+            isDefault,
+          };
+
+          createdAddress = await Address.create(addressPayload);
+        }
+      }
 
       res.json({
         status: "success",
         message: "Profile updated successfully",
-        data: { user },
+        data: { user, address: createdAddress },
       });
     } catch (error) {
       console.error("Update profile error:", error);

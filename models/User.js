@@ -42,48 +42,6 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    addresses: [
-      {
-        type: {
-          type: String,
-          enum: ["shipping", "billing"],
-          required: true,
-        },
-        fullName: {
-          type: String,
-          required: true,
-        },
-        phone: {
-          type: String,
-          required: true,
-        },
-        addressLine1: {
-          type: String,
-          required: true,
-        },
-        addressLine2: String,
-        city: {
-          type: String,
-          required: true,
-        },
-        state: {
-          type: String,
-          required: true,
-        },
-        postalCode: {
-          type: String,
-          required: true,
-        },
-        country: {
-          type: String,
-          default: "India",
-        },
-        isDefault: {
-          type: Boolean,
-          default: false,
-        },
-      },
-    ],
   },
   {
     timestamps: true,
