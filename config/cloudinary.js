@@ -16,16 +16,38 @@ console.log("✅ Cloudinary configured with:", {
   api_secret: cloudinary.config().api_secret ? "Loaded" : "Missing",
 });
 
-// ✅ Helper: Single image upload
+// ✅ Helper: Single image upload (supports both file path and buffer)
 const uploadImage = async (file, folder = "pavica-naturals") => {
   try {
-    const result = await cloudinary.uploader.upload(file.path, {
+    // If file has buffer (memory storage), upload from buffer
+    // If file has path (disk storage), upload from path
+    const uploadOptions = {
       folder,
       use_filename: true,
       unique_filename: true,
       resource_type: "image",
       transformation: [{ quality: "auto" }, { fetch_format: "auto" }],
-    });
+    };
+
+    let result;
+    if (file.buffer) {
+      // Upload from buffer (memory storage)
+      result = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          uploadOptions,
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        uploadStream.end(file.buffer);
+      });
+    } else if (file.path) {
+      // Upload from file path (disk storage)
+      result = await cloudinary.uploader.upload(file.path, uploadOptions);
+    } else {
+      throw new Error("File must have either buffer or path");
+    }
 
     return {
       success: true,

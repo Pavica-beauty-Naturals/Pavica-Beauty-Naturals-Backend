@@ -1,7 +1,6 @@
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
 import { uploadMultipleImages } from "../config/cloudinary.js";
-import fs from "fs";
 import mongoose from "mongoose";
 
 class ProductController {
@@ -254,13 +253,6 @@ class ProductController {
         }));
       }
 
-      // Clean up local uploads
-      if (req.files) {
-        req.files.forEach((file) => {
-          if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
-        });
-      }
-
       // Determine the price to use (basePrice takes precedence, fallback to price for backward compatibility)
       const finalBasePrice =
         basePrice !== undefined
@@ -402,11 +394,6 @@ class ProductController {
         // Add new images to existing images
         const existingProduct = await Product.findById(productId);
         updateData.images = [...(existingProduct.images || []), ...newImages];
-
-        // Clean up local uploads
-        req.files.forEach((file) => {
-          if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
-        });
       }
 
       const product = await Product.findByIdAndUpdate(productId, updateData, {
