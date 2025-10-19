@@ -9,13 +9,13 @@ class ProductController {
     try {
       const {
         page = 1,
-        limit = 12,
+        limit = 20,
         category,
         search,
         minPrice,
         maxPrice,
         sortBy = "createdAt",
-        sortOrder = "desc",
+        sortOrder = "asc",
       } = req.query;
 
       const offset = (page - 1) * limit;
