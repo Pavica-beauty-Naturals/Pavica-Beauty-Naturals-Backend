@@ -348,10 +348,10 @@ const orderValidation = {
 // Payment validation rules
 const paymentValidation = {
   createOrder: [
-    body("orderId").isUUID().withMessage("Valid order ID is required"),
+    body("orderId").isString().withMessage("Valid order ID is required"),
   ],
   verify: [
-    body("orderId").isUUID().withMessage("Valid order ID is required"),
+    body("orderId").isString().withMessage("Valid order ID is required"),
     body("paymentId").notEmpty().withMessage("Payment ID is required"),
     body("signature").notEmpty().withMessage("Payment signature is required"),
   ],

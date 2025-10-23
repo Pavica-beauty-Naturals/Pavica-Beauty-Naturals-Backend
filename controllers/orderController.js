@@ -16,17 +16,39 @@ class OrderController {
       }
 
       const orders = await Order.find(query)
-        .populate("items.product", "name productImageUrl sizeQuantity")
+        .populate({
+          path: "items.product",
+          select: "name sizeQuantity images", // Added additional image fields
+        })
         .sort({ createdAt: -1 })
         .skip(offset)
         .limit(parseInt(limit));
 
+      // console.log(orders[0].items[0].product);
+
       const totalOrders = await Order.countDocuments(query);
+
+      // Transform orders to include all image URLs
+      const transformedOrders = orders.map((order) => {
+        const orderObj = order.toObject();
+        console.log(orderObj.items, "items");
+
+        orderObj.items = orderObj.items.map((item) => ({
+          ...item,
+          product: {
+            ...item.product,
+            allImages: [(item.product && item.product.images) || []].filter(
+              Boolean
+            ), // Remove any null/undefined values
+          },
+        }));
+        return orderObj;
+      });
 
       res.json({
         status: "success",
         data: {
-          orders,
+          orders: transformedOrders,
           pagination: {
             currentPage: parseInt(page),
             totalPages: Math.ceil(totalOrders / limit),
@@ -54,10 +76,10 @@ class OrderController {
         _id: orderId,
         user: req.user.id,
       })
-        .populate(
-          "items.product",
-          "name productImageUrl sizeQuantity description"
-        )
+        .populate({
+          path: "items.product",
+          select: "name sizeQuantity description images",
+        })
         .populate("user", "firstName lastName email");
 
       if (!order) {
@@ -67,9 +89,19 @@ class OrderController {
         });
       }
 
+      // Transform order to include all image URLs
+      const transformedOrder = order.toObject();
+      transformedOrder.items = transformedOrder.items.map((item) => ({
+        ...item,
+        product: {
+          ...item.product,
+          allImages: [item.product.images || []].filter(Boolean), // Remove any null/undefined values
+        },
+      }));
+
       res.json({
         status: "success",
-        data: { order },
+        data: { order: transformedOrder },
       });
     } catch (error) {
       console.error("Get order error:", error);

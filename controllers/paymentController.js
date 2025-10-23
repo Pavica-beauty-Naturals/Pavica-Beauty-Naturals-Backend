@@ -23,7 +23,7 @@ class PaymentController {
       }
 
       // Check if order belongs to user
-      if (order.user._id.toString() !== req.user.id) {
+      if (order.user._id.toString() !== req.user.id.toString()) {
         return res.status(403).json({
           status: "error",
           message: "Access denied",
