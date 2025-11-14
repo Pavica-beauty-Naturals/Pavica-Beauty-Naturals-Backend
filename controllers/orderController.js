@@ -6,14 +6,18 @@ class OrderController {
   // Get user's orders
   static async getUserOrders(req, res) {
     try {
-      const { page = 1, limit = 10, status } = req.query;
+      const { page = 1, limit = 10, status, excludeStatus } = req.query;
       const offset = (page - 1) * limit;
 
       // Build query
-      const query = { user: req.user.id };
+
+      // Build query to exclude pending orders
+      const query = { user: req.user.id, status: { $ne: "pending" } };
       if (status) {
         query.status = status;
       }
+
+      const totalNonPendingOrders = await Order.countDocuments(query);
 
       const orders = await Order.find(query)
         .populate({
@@ -24,22 +28,14 @@ class OrderController {
         .skip(offset)
         .limit(parseInt(limit));
 
-      // console.log(orders[0].items[0].product);
-
-      const totalOrders = await Order.countDocuments(query);
-
       // Transform orders to include all image URLs
       const transformedOrders = orders.map((order) => {
         const orderObj = order.toObject();
-        console.log(orderObj.items, "items");
-
         orderObj.items = orderObj.items.map((item) => ({
           ...item,
           product: {
             ...item.product,
-            allImages: [(item.product && item.product.images) || []].filter(
-              Boolean
-            ), // Remove any null/undefined values
+            allImages: [(item.product && item.product.images) || []].filter(Boolean),
           },
         }));
         return orderObj;
@@ -51,23 +47,21 @@ class OrderController {
           orders: transformedOrders,
           pagination: {
             currentPage: parseInt(page),
-            totalPages: Math.ceil(totalOrders / limit),
-            totalOrders,
-            hasNext: offset + limit < totalOrders,
+            totalPages: Math.ceil(totalNonPendingOrders / limit),
+            totalOrders: totalNonPendingOrders,
+            hasNext: page < Math.ceil(totalNonPendingOrders / limit),
             hasPrev: page > 1,
           },
         },
       });
     } catch (error) {
-      console.error("Get orders error:", error);
+      console.error("Get user orders error:", error);
       res.status(500).json({
         status: "error",
-        message: "Failed to get orders",
+        message: "Failed to get user orders",
       });
     }
-  }
-
-  // Get single order details
+  } // Get single order details
   static async getOrderById(req, res) {
     try {
       const orderId = req.params.id;

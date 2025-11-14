@@ -167,6 +167,10 @@ class PaymentController {
       if (order) {
         await order.updatePaymentStatus("paid");
         await order.updateStatus("confirmed");
+        // Clear user's cart after successful payment
+        const Cart = (await import("../models/Cart.js")).default;
+        const cart = await Cart.findOne({ user: order.user });
+        if (cart) await cart.clear();
       }
 
       res.json({
