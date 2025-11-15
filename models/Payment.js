@@ -41,11 +41,14 @@ const paymentSchema = new mongoose.Schema(
       captured: Boolean,
       description: String,
       refund: {
-        id: String,
-        amount: Number,
-        status: String,
-        notes: String,
-        processed_at: Date,
+        type: {
+          id: String,
+          amount: Number,
+          status: String,
+          notes: String,
+          processed_at: Date,
+        },
+        required: false,
       },
       error_code: String,
       error_description: String,
@@ -87,10 +90,19 @@ paymentSchema.methods.markAsCompleted = function (
   this.razorpayPaymentId = paymentId;
   this.status = "completed";
   this.paymentMethod = paymentMethod;
-  this.transactionDetails = {
+
+  // Merge transaction details, but exclude undefined values for nested objects
+  const mergedDetails = {
     ...this.transactionDetails,
     ...transactionDetails,
   };
+
+  // Remove undefined values for nested objects like refund
+  if (mergedDetails.refund === undefined) {
+    delete mergedDetails.refund;
+  }
+
+  this.transactionDetails = mergedDetails;
   return this.save();
 };
 
@@ -102,12 +114,21 @@ paymentSchema.methods.markAsFailed = function (
 ) {
   this.razorpayPaymentId = paymentId;
   this.status = "failed";
-  this.transactionDetails = {
+
+  // Merge transaction details, but exclude undefined values for nested objects
+  const mergedDetails = {
     ...this.transactionDetails,
     error_code: errorCode,
     error_description: errorDescription,
     failed_at: new Date(),
   };
+
+  // Remove undefined values for nested objects like refund
+  if (mergedDetails.refund === undefined) {
+    delete mergedDetails.refund;
+  }
+
+  this.transactionDetails = mergedDetails;
   return this.save();
 };
 
