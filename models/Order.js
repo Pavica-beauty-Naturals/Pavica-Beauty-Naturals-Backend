@@ -230,7 +230,7 @@ orderSchema.statics.createFromCart = async function (
   await order.save();
 
   // Clear cart after successful order creation
-  await cart.clear();
+
 
   // Update product stock (handle both size-based and general stock)
   for (const item of orderItems) {
