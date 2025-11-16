@@ -548,6 +548,61 @@ class AdminController {
       });
     }
   }
+
+  // Update order status (Admin)
+  static async updateOrderStatus(req, res) {
+    try {
+      const orderId = req.params.id;
+      const { status } = req.body;
+
+      // Validate status
+      const validStatuses = [
+        "pending",
+        "confirmed",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "returned",
+      ];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          status: "error",
+          message: "Invalid order status",
+        });
+      }
+
+      const order = await Order.findById(orderId);
+      if (!order) {
+        return res.status(404).json({
+          status: "error",
+          message: "Order not found",
+        });
+      }
+
+      order.status = status;
+      await order.save();
+
+      res.json({
+        status: "success",
+        message: "Order status updated successfully",
+        data: {
+          order: {
+            id: order._id,
+            orderNumber: order.orderNumber,
+            status: order.status,
+            updatedAt: order.updatedAt,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Update order status error:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to update order status",
+      });
+    }
+  }
 }
 
 export default AdminController;
