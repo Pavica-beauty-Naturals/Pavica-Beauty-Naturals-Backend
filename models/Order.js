@@ -35,6 +35,12 @@ const orderSchema = new mongoose.Schema(
         },
       },
     ],
+    paymentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payment",
+      required: false,
+    },
+    
     totalAmount: {
       type: Number,
       required: true,

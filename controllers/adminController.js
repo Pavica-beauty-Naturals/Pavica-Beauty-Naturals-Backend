@@ -383,129 +383,165 @@ class AdminController {
 
   // Get all orders with admin details (Admin)
   static async getOrders(req, res) {
-    try {
-      const { page = 1, limit = 20, status, paymentStatus, search } = req.query;
-      const offset = (page - 1) * limit;
+  try {
+    const { page = 1, limit = 20, status, paymentStatus, search } = req.query;
+    const offset = (page - 1) * limit;
 
-      // Build query
-      const query = {};
-      if (status) query.status = status;
-      if (paymentStatus) query.paymentStatus = paymentStatus;
+    // Exclude 'pending' orders by default
+    const query = { status: { $ne: "pending" } };
+    if (status) query.status = status;
+    if (paymentStatus) query.paymentStatus = paymentStatus;
 
-      let orders;
-      let totalOrders;
+    let orders;
+    let totalOrders;
 
-      if (search) {
-        // Use aggregation for text search
-        const pipeline = [
-          {
-            $lookup: {
-              from: "users",
-              localField: "user",
-              foreignField: "_id",
-              as: "userData",
-            },
-          },
-          {
-            $match: {
-              ...query,
-              $or: [
-                { orderNumber: { $regex: search, $options: "i" } },
-                { "userData.firstName": { $regex: search, $options: "i" } },
-                { "userData.lastName": { $regex: search, $options: "i" } },
-              ],
-            },
-          },
-          {
-            $lookup: {
-              from: "products",
-              localField: "items.product",
-              foreignField: "_id",
-              as: "products",
-            },
-          },
-          {
-            $project: {
-              orderNumber: 1,
-              totalAmount: 1,
-              shippingAmount: 1,
-              discountAmount: 1,
-              finalAmount: 1,
-              status: 1,
-              paymentStatus: 1,
-              shippingAddress: 1,
-              createdAt: 1,
-              "userData.firstName": 1,
-              "userData.lastName": 1,
-              "userData.email": 1,
-              "products.name": 1,
-              "products.productImageUrl": 1,
-              items: 1,
-            },
-          },
-          { $sort: { createdAt: -1 } },
-          { $skip: offset },
-          { $limit: parseInt(limit) },
-        ];
-
-        orders = await Order.aggregate(pipeline);
-
-        const countPipeline = [
-          {
-            $lookup: {
-              from: "users",
-              localField: "user",
-              foreignField: "_id",
-              as: "userData",
-            },
-          },
-          {
-            $match: {
-              ...query,
-              $or: [
-                { orderNumber: { $regex: search, $options: "i" } },
-                { "userData.firstName": { $regex: search, $options: "i" } },
-                { "userData.lastName": { $regex: search, $options: "i" } },
-              ],
-            },
-          },
-          { $count: "total" },
-        ];
-
-        const countResult = await Order.aggregate(countPipeline);
-        totalOrders = countResult.length > 0 ? countResult[0].total : 0;
-      } else {
-        orders = await Order.find(query)
-          .populate("user", "firstName lastName email")
-          .populate("items.product", "name productImageUrl")
-          .sort({ createdAt: -1 })
-          .skip(offset)
-          .limit(parseInt(limit));
-
-        totalOrders = await Order.countDocuments(query);
-      }
-
-      res.json({
-        status: "success",
-        data: {
-          orders,
-          pagination: {
-            currentPage: parseInt(page),
-            totalPages: Math.ceil(totalOrders / limit),
-            totalOrders,
-            hasNext: offset + limit < totalOrders,
-            hasPrev: page > 1,
+    // -----------------------------
+    if (search && search.trim() !== "") {
+      const pipeline = [
+        { $match: { ...query, status: { $ne: "pending" } } },
+        { $unwind: "$items" },
+        {
+          $lookup: {
+            from: "users",
+            localField: "user",
+            foreignField: "_id",
+            as: "userData",
           },
         },
-      });
-    } catch (error) {
-      console.error("Get admin orders error:", error);
-      res.status(500).json({
-        status: "error",
-        message: "Failed to get orders",
-      });
+        { $unwind: "$userData" },
+        {
+          $lookup: {
+            from: "products",
+            localField: "items.product",
+            foreignField: "_id",
+            as: "productData",
+          },
+        },
+        { $unwind: "$productData" },
+        {
+          $match: {
+            $or: [
+              { orderNumber: { $regex: search, $options: "i" } },
+              { "userData.firstName": { $regex: search, $options: "i" } },
+              { "userData.lastName": { $regex: search, $options: "i" } },
+              { "productData.name": { $regex: search, $options: "i" } },
+            ],
+          },
+        },
+        {
+          $group: {
+            _id: "$_id",
+            orderNumber: { $first: "$orderNumber" },
+            totalAmount: { $first: "$totalAmount" },
+            shippingAmount: { $first: "$shippingAmount" },
+            discountAmount: { $first: "$discountAmount" },
+            finalAmount: { $first: "$finalAmount" },
+            status: { $first: "$status" },
+            paymentStatus: { $first: "$paymentStatus" },
+            createdAt: { $first: "$createdAt" },
+            updatedAt: { $first: "$updatedAt" },
+            notes: { $first: "$notes" },
+            shippingAddress: { $first: "$shippingAddress" },
+            billingAddress: { $first: "$billingAddress" },
+            user: { $first: "$user" },
+            user: { $first: "$userData" },
+            items: {
+              $push: {
+                _id: "$items._id",
+                quantity: "$items.quantity",
+                sizeQuantity: "$items.sizeQuantity",
+                price: "$items.price",
+                product: "$productData",
+              },
+            },
+          },
+        },
+        { $sort: { createdAt: -1 } },
+        { $skip: offset },
+        { $limit: parseInt(limit) },
+      ];
+
+      orders = await Order.aggregate(pipeline);
+
+      // COUNT
+      const countPipeline = [
+        { $match: { ...query, status: { $ne: "pending" } } },
+        { $unwind: "$items" },
+        {
+          $lookup: {
+            from: "users",
+            localField: "user",
+            foreignField: "_id",
+            as: "userData",
+          },
+        },
+        { $unwind: "$userData" },
+        {
+          $lookup: {
+            from: "products",
+            localField: "items.product",
+            foreignField: "_id",
+            as: "productData",
+          },
+        },
+        { $unwind: "$productData" },
+        {
+          $match: {
+            $or: [
+              { orderNumber: { $regex: search, $options: "i" } },
+              { "userData.firstName": { $regex: search, $options: "i" } },
+              { "userData.lastName": { $regex: search, $options: "i" } },
+              { "productData.name": { $regex: search, $options: "i" } },
+            ],
+          },
+        },
+        { $group: { _id: "$_id" } },
+        { $count: "total" },
+      ];
+
+      const countResult = await Order.aggregate(countPipeline);
+      totalOrders = countResult.length ? countResult[0].total : 0;
     }
+
+    // -----------------------------
+    // NON-SEARCH MODE (Populate)
+    // -----------------------------
+    else {
+      // Always exclude pending orders in non-search mode
+      const nonPendingQuery = { ...query, status: { $ne: "pending" } };
+      orders = await Order.find(nonPendingQuery)
+        .populate("user", "firstName lastName email")
+        .populate("items.product") // FULL PRODUCT INCLUDING IMAGES
+        .populate("paymentId")
+        .sort({ createdAt: -1 })
+        .skip(offset)
+        .limit(parseInt(limit));
+
+      totalOrders = await Order.countDocuments(nonPendingQuery);
+    }
+
+    return res.json({
+      status: "success",
+      data: {
+        orders,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(totalOrders / limit),
+          totalOrders,
+          hasNext: offset + limit < totalOrders,
+          hasPrev: page > 1,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get admin orders error:", error);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to get orders",
+    });
   }
+}
+
 
   // Get all reviews (Admin)
   static async getReviews(req, res) {
