@@ -90,4 +90,12 @@ router.get(
   AdminController.getReviews
 );
 
+// @route   PUT /api/admin/orders/:id/status
+// @desc    Update order status (Admin)
+// @access  Private/Admin
+router.put(
+  "/orders/:id/status",
+  AdminController.updateOrderStatus
+);
+
 export default router;

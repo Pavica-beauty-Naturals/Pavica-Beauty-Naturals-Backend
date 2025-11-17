@@ -162,11 +162,13 @@ class PaymentController {
         description: razorpayPayment.description,
       });
 
-      // Update order status
+      // Update order status and set paymentId
       const order = await Order.findById(orderId);
       if (order) {
+        order.paymentId = paymentRecord._id;
         await order.updatePaymentStatus("paid");
         await order.updateStatus("confirmed");
+        await order.save();
         // Clear user's cart after successful payment
         const Cart = (await import("../models/Cart.js")).default;
         const cart = await Cart.findOne({ user: order.user });
