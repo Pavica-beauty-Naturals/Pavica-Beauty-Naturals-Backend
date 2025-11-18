@@ -93,6 +93,15 @@ router.get(
 // @route   PUT /api/admin/orders/:id/status
 // @desc    Update order status (Admin)
 // @access  Private/Admin
+
+// @route   DELETE /api/admin/orders/:id
+// @desc    Delete order (Admin only)
+// @access  Private/Admin
+router.delete(
+  "/orders/:id",
+  AdminController.deleteOrder
+);
+
 router.put(
   "/orders/:id/status",
   AdminController.updateOrderStatus
