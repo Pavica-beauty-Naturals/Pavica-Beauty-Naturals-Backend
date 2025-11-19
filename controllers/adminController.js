@@ -346,19 +346,13 @@ class AdminController {
         });
       }
 
-      // Prevent deactivating the last admin
-      if (!isActive && existingUser.role === "admin") {
-        const adminCount = await User.countDocuments({
-          role: "admin",
-          isActive: true,
-        });
+      const adminCount = await User.countDocuments({ role: "admin", isActive: true });
 
-        if (adminCount <= 1) {
-          return res.status(400).json({
-            status: "error",
-            message: "Cannot deactivate the last admin user",
-          });
-        }
+      if (!isActive && adminCount <= 1) {
+        return res.status(400).json({
+          status: "error",
+          message: "Cannot deactivate the last admin user",
+        });
       }
 
       const user = await User.findByIdAndUpdate(
@@ -636,6 +630,32 @@ class AdminController {
       res.status(500).json({
         status: "error",
         message: "Failed to update order status",
+      });
+    }
+  }
+
+  // Delete order (Admin)
+  static async deleteOrder(req, res) {
+    try {
+      const orderId = req.params.id;
+      const order = await Order.findById(orderId);
+      if (!order) {
+        return res.status(404).json({
+          status: "error",
+          message: "Order not found",
+        });
+      }
+      await order.deleteOne();
+      res.json({
+        status: "success",
+        message: "Order deleted successfully",
+        data: { orderId },
+      });
+    } catch (error) {
+      console.error("Delete order error:", error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to delete order",
       });
     }
   }
