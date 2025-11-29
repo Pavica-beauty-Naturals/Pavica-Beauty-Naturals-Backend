@@ -1,19 +1,48 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
 
+// Function to get Razorpay credentials based on profile
+const getRazorpayCredentials = () => {
+  // Get the profile (test or live), default to test if not specified
+  const profile = (process.env.RAZORPAY_PROFILE || "test").toUpperCase();
+
+  // Support for multiple profiles (RAZORPAY_KEY_ID_TEST, RAZORPAY_KEY_ID_LIVE, etc.)
+  const keyId =
+    process.env[`RAZORPAY_KEY_ID_${profile}`] || process.env.RAZORPAY_KEY_ID;
+  const keySecret =
+    process.env[`RAZORPAY_KEY_SECRET_${profile}`] ||
+    process.env.RAZORPAY_KEY_SECRET;
+
+  return { keyId, keySecret, profile: profile.toLowerCase() };
+};
+
 // Initialize Razorpay instance only if credentials are available
 let razorpay = null;
+let currentProfile = null;
 
-if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+const { keyId, keySecret, profile } = getRazorpayCredentials();
+
+if (keyId && keySecret) {
   razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
+    key_id: keyId,
+    key_secret: keySecret,
   });
+  currentProfile = profile;
+  console.log(`✅ Razorpay initialized with profile ${profile}`);
 } else {
   console.warn(
     "⚠️  Razorpay credentials not found. Payment features will be disabled."
   );
 }
+
+// Function to get current Razorpay key secret for signature verification
+const getCurrentKeySecret = () => {
+  const profile = (process.env.RAZORPAY_PROFILE || "test").toUpperCase();
+  return (
+    process.env[`RAZORPAY_KEY_SECRET_${profile}`] ||
+    process.env.RAZORPAY_KEY_SECRET
+  );
+};
 
 // Helper function to create Razorpay order
 const createRazorpayOrder = async (
@@ -53,14 +82,15 @@ const createRazorpayOrder = async (
 
 // Helper function to verify payment signature
 const verifyPaymentSignature = (orderId, paymentId, signature) => {
-  if (!process.env.RAZORPAY_KEY_SECRET) {
+  const keySecret = getCurrentKeySecret();
+  if (!keySecret) {
     console.error("RAZORPAY_KEY_SECRET not configured");
     return false;
   }
 
   try {
     const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .createHmac("sha256", keySecret)
       .update(`${orderId}|${paymentId}`)
       .digest("hex");
 
@@ -162,4 +192,6 @@ export {
   capturePayment,
   getPaymentDetails,
   refundPayment,
+  getRazorpayCredentials,
+  getCurrentKeySecret,
 };
